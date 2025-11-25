@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
 
 // Utility functions
 function calcConsensus(reviews) {
@@ -26,15 +27,19 @@ function getTierFromScore(score) {
   if (score >= 8.0) return 'A'
   if (score >= 7.0) return 'B'
   if (score >= 6.0) return 'C'
-  return 'D'
+  if (score >= 5.0) return 'D'
+  if (score >= 3.0) return 'E'
+  return 'F'
 }
 
 function getTierColor(tier) {
   if (tier === 'S+' || tier === 'S') return '#ff7f7e'
   if (tier === 'A') return '#fbbf24'
-  if (tier === 'B') return '#60a5fa'
+  if (tier === 'B') return '#feff7f'
   if (tier === 'C') return '#10b981'
-  return '#a3a3a3'
+  if (tier === 'D') return '#60a5fa'
+  if (tier === 'E') return '#a3a3a3'
+  return '#ef4444'
 }
 
 // Mock data
@@ -119,6 +124,12 @@ const seedProducts = [
 export default function HomePage() {
   const [isLightMode, setIsLightMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [mounted, setMounted] = useState(false)
+
+  // Fix hydration issue
+  useState(() => {
+    setMounted(true)
+  }, [])
 
   const toggleTheme = () => {
     setIsLightMode(!isLightMode)
@@ -131,6 +142,10 @@ export default function HomePage() {
         product.sku.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : seedProducts
+
+  if (!mounted) {
+    return null
+  }
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isLightMode ? 'bg-neutral-100 text-neutral-900' : 'bg-black text-white'}`}>
@@ -161,9 +176,22 @@ export default function HomePage() {
             <Link href="/" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
               Home
             </Link>
-            <Link href="/profile" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
-              Profile
-            </Link>
+            
+            {/* Clerk Authentication */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${isLightMode ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white text-black hover:bg-neutral-200'}`}>
+                  Sign In
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <Link href="/profile" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
+                Profile
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+
             <button
               onClick={toggleTheme}
               className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all ${isLightMode ? 'border-neutral-300 hover:bg-neutral-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
@@ -197,6 +225,7 @@ export default function HomePage() {
               {filteredProducts.map((p) => {
                 const c = calcConsensus(p.reviews)
                 const tier = getTierFromScore(c.avg)
+                const tierColor = getTierColor(tier)
                 return (
                   <Link
                     key={p.id}
@@ -229,10 +258,10 @@ export default function HomePage() {
                         <div className="mb-3">
                           <div className="inline-flex items-center gap-2">
                             <span
-                              className="inline-flex items-center justify-center w-6 h-6 rounded font-bold text-sm bg-black"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded font-bold text-sm bg-black"
                               style={{
-                                color: getTierColor(tier),
-                                filter: `drop-shadow(0 0 4px ${getTierColor(tier)}) drop-shadow(0 0 8px ${getTierColor(tier)})`,
+                                color: tierColor,
+                                filter: `drop-shadow(0 0 4px ${tierColor}) drop-shadow(0 0 8px ${tierColor})`,
                               }}
                             >
                               {tier}
