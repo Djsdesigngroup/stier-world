@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
+import { supabase } from './lib/supabase'
 
 // Utility functions
 function calcConsensus(reviews) {
@@ -42,93 +43,47 @@ function getTierColor(tier) {
   return '#ef4444'
 }
 
-// Mock data
-const seedProducts = [
-  {
-    id: 'jordan-midnight-navy',
-    title: 'Jordan 1 Retro High OG Midnight Navy',
-    slug: 'jordan-1-midnight-navy',
-    category: 'Sneakers',
-    sku: 'DZ5485-401',
-    image: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=1200&auto=format&fit=crop',
-    price: '$220',
-    reviews: [
-      { author: '@SneakerHead', rating: 5, verified: true, text: 'Premium leather, classic colorway.', helpful: 45 },
-      { author: '@JordanCollector', rating: 5, verified: true, text: 'Quality is top-notch.', helpful: 32 },
-    ],
-  },
-  {
-    id: 'yeezy-350',
-    title: 'Yeezy Boost 350 V2',
-    slug: 'yeezy-boost-350-v2',
-    category: 'Sneakers',
-    sku: 'YEEZY-350',
-    image: 'https://images.unsplash.com/photo-1575537302964-96cd47c06b1b?q=80&w=1200&auto=format&fit=crop',
-    price: '$220',
-    reviews: [
-      { author: '@YeezyFan', rating: 4, verified: true, text: 'Super comfortable.', helpful: 28 },
-    ],
-  },
-  {
-    id: 'dunk-low-panda',
-    title: 'Nike Dunk Low Panda',
-    slug: 'nike-dunk-low-panda',
-    category: 'Sneakers',
-    sku: 'DUNK-PANDA',
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop',
-    price: '$110',
-    reviews: [
-      { author: '@DunkCollector', rating: 5, verified: true, text: 'Classic black and white.', helpful: 52 },
-    ],
-  },
-  {
-    id: 'air-jordan-4',
-    title: 'Air Jordan 4 Retro Military Black',
-    slug: 'air-jordan-4-military-black',
-    category: 'Sneakers',
-    sku: 'AJ4-MB',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?q=80&w=1200&auto=format&fit=crop',
-    price: '$215',
-    reviews: [
-      { author: '@Collector', rating: 5, verified: true, text: 'Peak Jordan design.', helpful: 67 },
-      { author: '@Sneakerhead', rating: 5, verified: true, text: 'Perfection.', helpful: 43 },
-    ],
-  },
-  {
-    id: 'new-balance-550',
-    title: 'New Balance 550 White Green',
-    slug: 'new-balance-550-white-green',
-    category: 'Sneakers',
-    sku: 'NB-550',
-    image: 'https://images.unsplash.com/photo-1539185441755-769473a23570?q=80&w=1200&auto=format&fit=crop',
-    price: '$120',
-    reviews: [
-      { author: '@Vintage', rating: 4, verified: true, text: 'Retro vibes.', helpful: 31 },
-    ],
-  },
-  {
-    id: 'travis-scott-low',
-    title: 'Travis Scott x Jordan 1 Low',
-    slug: 'travis-scott-jordan-1-low',
-    category: 'Sneakers',
-    sku: 'TS-J1',
-    image: 'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?q=80&w=1200&auto=format&fit=crop',
-    price: '$1,200',
-    reviews: [
-      { author: '@Hype', rating: 5, verified: true, text: 'Iconic collab.', helpful: 89 },
-      { author: '@Travis', rating: 5, verified: true, text: 'Best Jordan collab ever.', helpful: 76 },
-    ],
-  },
-]
-
 export default function HomePage() {
   const [isLightMode, setIsLightMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
   // Fix hydration issue
-  useState(() => {
+  useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Fetch products from Supabase
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        // For now, add mock reviews to each product
+        // We'll replace this with real ratings later
+        const productsWithMockReviews = data.map(product => ({
+          ...product,
+          reviews: [
+            { author: '@Reviewer', rating: 5, verified: true, text: 'Great sneaker!', helpful: 10 }
+          ]
+        }))
+
+        setProducts(productsWithMockReviews)
+      } catch (error) {
+        console.error('Error fetching products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
   }, [])
 
   const toggleTheme = () => {
@@ -136,12 +91,12 @@ export default function HomePage() {
   }
 
   const filteredProducts = searchQuery.trim()
-    ? seedProducts.filter((product) =>
+    ? products.filter((product) =>
         product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
       )
-    : seedProducts
+    : products
 
   if (!mounted) {
     return null
@@ -214,10 +169,16 @@ export default function HomePage() {
             </p>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {loading ? (
             <div className="text-center py-12">
               <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                No sneakers found matching "{searchQuery}"
+                Loading sneakers...
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                {searchQuery ? `No sneakers found matching "${searchQuery}"` : 'No sneakers available'}
               </p>
             </div>
           ) : (
@@ -239,7 +200,7 @@ export default function HomePage() {
                     {/* Image */}
                     <div className={`aspect-square relative ${isLightMode ? 'bg-neutral-50' : 'bg-neutral-800'}`}>
                       <Image
-                        src={p.image}
+                        src={p.image_url}
                         alt={p.title}
                         fill
                         className="object-contain"
