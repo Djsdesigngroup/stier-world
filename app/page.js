@@ -62,6 +62,7 @@ export default function HomePage() {
         const { data, error } = await supabase
           .from('products')
           .select('*')
+          .eq('category', 'Video Games')
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -71,7 +72,7 @@ export default function HomePage() {
         const productsWithMockReviews = data.map(product => ({
           ...product,
           reviews: [
-            { author: '@Reviewer', rating: 5, verified: true, text: 'Great sneaker!', helpful: 10 }
+            { author: '@Reviewer', rating: 5, verified: true, text: 'Great game!', helpful: 10 }
           ]
         }))
 
@@ -119,7 +120,7 @@ export default function HomePage() {
           <div className="flex-1 max-w-xl">
             <input
               type="text"
-              placeholder="Search sneakers, brands, colorways..."
+              placeholder="Search games, genres, platforms..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full border rounded-lg px-4 py-2 text-sm transition-colors ${isLightMode ? 'bg-neutral-100 border-neutral-300 text-neutral-900 placeholder:text-neutral-500' : 'bg-neutral-900 border-neutral-700 text-white placeholder:text-neutral-500'}`}
@@ -162,23 +163,23 @@ export default function HomePage() {
         <section className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              {searchQuery ? `Results for "${searchQuery}"` : 'Top Rated Sneakers'}
+              {searchQuery ? `Results for "${searchQuery}"` : 'Top Rated Games'}
             </h1>
             <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
-              Discover the highest-rated sneakers verified by our community
+              Discover the highest-rated games ranked by the community
             </p>
           </div>
 
           {loading ? (
             <div className="text-center py-12">
               <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                Loading sneakers...
+                Loading games...
               </p>
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="text-center py-12">
               <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                {searchQuery ? `No sneakers found matching "${searchQuery}"` : 'No sneakers available'}
+                {searchQuery ? `No games found matching "${searchQuery}"` : 'No games available'}
               </p>
             </div>
           ) : (
@@ -203,7 +204,7 @@ export default function HomePage() {
                         src={p.image_url}
                         alt={p.title}
                         fill
-                        className="object-contain"
+                        className="object-cover"
                       />
                     </div>
 
@@ -252,7 +253,7 @@ export default function HomePage() {
       <footer className={`mt-16 border-t transition-colors ${isLightMode ? 'border-neutral-200' : 'border-neutral-800'}`}>
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className={`text-sm ${isLightMode ? 'text-neutral-500' : 'text-neutral-500'}`}>
-            <p>© 2025 S Tier World — Premium sneaker ratings and marketplace</p>
+            <p>© 2025 S Tier World — Community game ratings and tier lists</p>
           </div>
         </div>
       </footer>

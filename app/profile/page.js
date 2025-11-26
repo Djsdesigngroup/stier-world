@@ -1,87 +1,90 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUser, SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
+import { supabase } from '../lib/supabase'
 
+// Utility functions
 function getTierFromScore(score) {
   if (score >= 9.5) return 'S+'
   if (score >= 9.0) return 'S'
   if (score >= 8.0) return 'A'
   if (score >= 7.0) return 'B'
   if (score >= 6.0) return 'C'
-  return 'D'
+  if (score >= 5.0) return 'D'
+  if (score >= 3.0) return 'E'
+  return 'F'
 }
 
 function getTierColor(tier) {
   if (tier === 'S+' || tier === 'S') return '#ff7f7e'
   if (tier === 'A') return '#fbbf24'
-  if (tier === 'B') return '#60a5fa'
+  if (tier === 'B') return '#feff7f'
   if (tier === 'C') return '#10b981'
-  return '#a3a3a3'
+  if (tier === 'D') return '#60a5fa'
+  if (tier === 'E') return '#a3a3a3'
+  return '#ef4444'
 }
 
-// Mock user ratings data
-const userRatings = [
-  {
-    id: 'jordan-midnight-navy',
-    title: 'Jordan 1 Retro High OG Midnight Navy',
-    slug: 'jordan-1-midnight-navy',
-    image: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=400&auto=format&fit=crop',
-    userRating: 'S+',
-    userScore: 9.8,
-    price: '$220',
-    dateRated: '2 days ago',
-    userReview: 'Absolutely stunning. Perfect in every way.',
-  },
-  {
-    id: 'travis-scott-low',
-    title: 'Travis Scott x Jordan 1 Low',
-    slug: 'travis-scott-jordan-1-low',
-    image: 'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?q=80&w=400&auto=format&fit=crop',
-    userRating: 'S',
-    userScore: 9.4,
-    price: '$1,200',
-    dateRated: '1 week ago',
-    userReview: 'Iconic collab. The reverse swoosh is amazing.',
-  },
-  {
-    id: 'air-jordan-4',
-    title: 'Air Jordan 4 Retro Military Black',
-    slug: 'air-jordan-4-military-black',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?q=80&w=400&auto=format&fit=crop',
-    userRating: 'S',
-    userScore: 9.0,
-    price: '$215',
-    dateRated: '2 weeks ago',
-    userReview: 'Classic Jordan silhouette done right.',
-  },
-  {
-    id: 'yeezy-350',
-    title: 'Yeezy Boost 350 V2',
-    slug: 'yeezy-boost-350-v2',
-    image: 'https://images.unsplash.com/photo-1575537302964-96cd47c06b1b?q=80&w=400&auto=format&fit=crop',
-    userRating: 'A',
-    userScore: 8.5,
-    price: '$220',
-    dateRated: '3 weeks ago',
-    userReview: 'Comfortable but not as hyped anymore.',
-  },
-]
-
 export default function ProfilePage() {
+  const { user, isLoaded } = useUser()
   const [isLightMode, setIsLightMode] = useState(false)
-  const [activeTab, setActiveTab] = useState('rated')
+  const [games, setGames] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
-  const toggleTheme = () => {
-    setIsLightMode(!isLightMode)
-  }
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    async function fetchGames() {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', 'Video Games')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        // For demo: show first 12 games
+        const userGames = data.slice(0, 12).map(game => ({
+          ...game,
+          score: 10.0,
+          userRating: 5,
+        }))
+
+        setGames(userGames)
+      } catch (error) {
+        console.error('Error fetching games:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchGames()
+  }, [])
+
+  // Group games by tier
+  const gamesByTier = games.reduce((acc, game) => {
+    const tier = getTierFromScore(game.score)
+    if (!acc[tier]) acc[tier] = []
+    acc[tier].push(game)
+    return acc
+  }, {})
+
+  const tiers = ['S+', 'S', 'A', 'B', 'C', 'D', 'E', 'F']
+
+  if (!mounted) return null
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isLightMode ? 'bg-neutral-100 text-neutral-900' : 'bg-black text-white'}`}>
       {/* HEADER */}
       <header className={`border-b sticky top-0 z-10 backdrop-blur transition-colors ${isLightMode ? 'bg-white/90 border-neutral-200' : 'bg-black/90 border-neutral-800'}`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+        <div className="max-w-7xl mx-auto flex items-center gap-6 px-6 py-3">
           <Link href="/" className={`inline-flex items-center gap-2 font-bold text-lg ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
             <span className={`inline-flex items-center justify-center w-8 h-8 rounded ${isLightMode ? 'bg-black text-white' : 'bg-white text-black'}`}>
               S
@@ -89,15 +92,31 @@ export default function ProfilePage() {
             <span>Tier World</span>
           </Link>
 
-          <nav className="flex items-center gap-5">
+          <nav className="flex items-center gap-5 ml-auto">
             <Link href="/" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
-              Browse
+              Home
             </Link>
-            <Link href="/profile" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
-              Profile
+            <Link href="/tierlist" className={`text-sm transition-colors ${isLightMode ? 'text-neutral-600 hover:text-neutral-900' : 'text-neutral-400 hover:text-white'}`}>
+              Tier List
             </Link>
+            
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${isLightMode ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white text-black hover:bg-neutral-200'}`}>
+                  Sign In
+                </button>
+              </SignInButton>
+            </SignedOut>
+            
+            <SignedIn>
+              <Link href="/profile" className={`text-sm font-medium transition-colors ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
+                Profile
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+
             <button
-              onClick={toggleTheme}
+              onClick={() => setIsLightMode(!isLightMode)}
               className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all ${isLightMode ? 'border-neutral-300 hover:bg-neutral-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
             >
               <span className="text-base">{isLightMode ? '🌙' : '☀️'}</span>
@@ -106,118 +125,297 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      {/* PROFILE HEADER */}
-      <div className={`border-b transition-colors ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-            <div className="relative w-24 h-24">
-              <Image
-                src="https://ui-avatars.com/api/?name=SneakerHead247&size=200&background=ff7f7e&color=fff&bold=true"
-                alt="User Avatar"
-                fill
-                className="rounded-full border-4"
-                style={{ borderColor: '#ff7f7e' }}
-              />
-            </div>
-
-            <div className="flex-1">
-              <h1 className={`text-3xl font-bold mb-2 ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
-                SneakerHead247
-              </h1>
-              <div className={`flex flex-wrap gap-4 text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
-                <span>📍 Los Angeles, CA</span>
-                <span>📅 Joined March 2024</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            {[
-              { label: 'Products Rated', value: 4 },
-              { label: 'Reviews', value: 4 },
-              { label: 'Followers', value: 234 },
-              { label: 'Following', value: 189 },
-            ].map((stat, idx) => (
-              <div key={idx} className={`text-center p-3 rounded-lg ${isLightMode ? 'bg-neutral-50' : 'bg-neutral-950'}`}>
-                <div className={`text-2xl font-bold ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>{stat.value}</div>
-                <div className={`text-xs mt-1 ${isLightMode ? 'text-neutral-600' : 'text-neutral-500'}`}>{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* CONTENT */}
+      {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="space-y-4">
-          <h2 className={`text-2xl font-bold ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>Your Ratings</h2>
+        <SignedOut>
+          {/* Preview Banner */}
+          <div className={`mb-8 p-6 rounded-xl border-2 text-center ${isLightMode ? 'bg-gradient-to-br from-neutral-50 to-white border-neutral-300' : 'bg-gradient-to-br from-neutral-900 to-neutral-950 border-neutral-700'}`}>
+            <h2 className="text-2xl font-bold mb-2">Preview: What Your Profile Could Look Like</h2>
+            <p className={`mb-4 ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+              Sign in to create your personal tier list and track your ratings
+            </p>
+            <SignInButton mode="modal">
+              <button className={`px-6 py-3 rounded-lg font-medium transition-colors ${isLightMode ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white text-black hover:bg-neutral-200'}`}>
+                Sign In to Get Started
+              </button>
+            </SignInButton>
+          </div>
 
-          {/* Rated Products Grid */}
-          <div className="grid gap-4">
-            {userRatings.map((product) => (
-              <Link
-                key={product.id}
-                href={`/products/${product.slug}`}
-                className={`rounded-xl border overflow-hidden transition-all hover:shadow-lg ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}
-              >
-                <div className="flex flex-col md:flex-row">
-                  {/* Product Image */}
-                  <div className={`w-full md:w-48 h-48 relative ${isLightMode ? 'bg-neutral-50' : 'bg-neutral-800'}`}>
-                    <Image
-                      src={product.image}
-                      alt={product.title}
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
+          {/* Preview Profile */}
+          <div className="mb-8 opacity-75">
+            <div className="flex items-center gap-4 mb-4">
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center ${isLightMode ? 'bg-neutral-200' : 'bg-neutral-800'}`}>
+                <span className="text-3xl">👤</span>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold">Your Profile</h1>
+                <p className={`text-lg mt-1 ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+                  12 games rated
+                </p>
+              </div>
+            </div>
 
-                  {/* Product Info */}
-                  <div className="flex-1 p-4">
-                    <div className="flex items-start justify-between gap-4 mb-3">
-                      <div className="flex-1">
-                        <h3 className={`text-lg font-semibold mb-1 ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
-                          {product.title}
-                        </h3>
-                        <div className={`flex items-center gap-3 text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
-                          <span>{product.price}</span>
-                          <span>•</span>
-                          <span>{product.dateRated}</span>
+            {/* Preview Stats */}
+            <div className="grid grid-cols-3 gap-4 max-w-2xl">
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>Total Ratings</p>
+                <p className="text-2xl font-bold">12</p>
+              </div>
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>Average Rating</p>
+                <p className="text-2xl font-bold">9.2/10</p>
+              </div>
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>S+ Tier Games</p>
+                <p className="text-2xl font-bold">5</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Tier List */}
+          <div className="mb-8 opacity-75">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold">My Tier List</h2>
+              <button disabled className={`px-4 py-2 rounded-lg border opacity-50 cursor-not-allowed ${isLightMode ? 'border-neutral-300 bg-neutral-100' : 'border-neutral-700 bg-neutral-800'}`}>
+                Share My List
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">
+                <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                  Loading preview...
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6 relative">
+                {/* Overlay to prevent interaction */}
+                <div className="absolute inset-0 bg-transparent z-10" />
+                
+                {tiers.slice(0, 2).map(tier => {
+                  const tieredGames = gamesByTier[tier] || []
+                  if (tieredGames.length === 0) return null
+
+                  const tierColor = getTierColor(tier)
+
+                  return (
+                    <div key={tier} className={`rounded-xl overflow-hidden border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                      <div className={`px-6 py-4 border-b flex items-center justify-between ${isLightMode ? 'bg-neutral-50 border-neutral-200' : 'bg-neutral-800/50 border-neutral-700'}`}>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="inline-flex items-center justify-center w-12 h-12 rounded-lg font-bold text-xl bg-black"
+                            style={{
+                              color: tierColor,
+                              filter: `drop-shadow(0 0 6px ${tierColor}) drop-shadow(0 0 12px ${tierColor})`,
+                            }}
+                          >
+                            {tier}
+                          </span>
+                          <div>
+                            <h3 className={`text-xl font-bold ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
+                              {tier} Tier
+                            </h3>
+                            <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+                              {tieredGames.length} {tieredGames.length === 1 ? 'game' : 'games'}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
-                      {/* User Rating Badge */}
-                      <div className="flex flex-col items-end gap-2">
-                        <div
-                          className="inline-flex items-center justify-center w-14 h-14 rounded font-bold text-xl bg-black"
-                          style={{
-                            color: getTierColor(product.userRating),
-                            filter: `drop-shadow(0 0 4px ${getTierColor(product.userRating)}) drop-shadow(0 0 8px ${getTierColor(product.userRating)})`,
-                          }}
-                        >
-                          {product.userRating}
-                        </div>
-                        <div className={`text-sm font-bold ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
-                          {product.userScore}/10
+                      <div className="p-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                          {tieredGames.map(game => (
+                            <div
+                              key={game.id}
+                              className={`group rounded-lg overflow-hidden border ${isLightMode ? 'border-neutral-200' : 'border-neutral-800'}`}
+                            >
+                              <div className={`aspect-square relative ${isLightMode ? 'bg-neutral-100' : 'bg-neutral-800'}`}>
+                                <Image
+                                  src={game.image_url}
+                                  alt={game.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className={`p-2 ${isLightMode ? 'bg-white' : 'bg-neutral-900'}`}>
+                                <h4 className={`text-xs font-medium line-clamp-2 ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
+                                  {game.title}
+                                </h4>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className={`text-xs ${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                                    ⭐ 5/5
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
-
-                    {/* Review */}
-                    {product.userReview && (
-                      <div className={`text-sm p-3 rounded-lg ${isLightMode ? 'bg-neutral-50' : 'bg-neutral-800'}`}>
-                        <p className={`${isLightMode ? 'text-neutral-700' : 'text-neutral-300'}`}>
-                          "{product.userReview}"
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  )
+                })}
+                
+                {/* CTA at bottom */}
+                <div className={`text-center py-12 rounded-xl border-2 ${isLightMode ? 'bg-neutral-50 border-neutral-300' : 'bg-neutral-900 border-neutral-700'}`}>
+                  <h3 className="text-2xl font-bold mb-3">Want to create your own tier list?</h3>
+                  <SignInButton mode="modal">
+                    <button className={`px-8 py-4 rounded-lg font-medium text-lg transition-colors ${isLightMode ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white text-black hover:bg-neutral-200'}`}>
+                      Sign In Now
+                    </button>
+                  </SignInButton>
                 </div>
-              </Link>
-            ))}
+              </div>
+            )}
+          </div>
+        </SignedOut>
+
+        <SignedIn>
+          {/* User Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-4 mb-4">
+              {user?.imageUrl && (
+                <Image
+                  src={user.imageUrl}
+                  alt={user.firstName || 'User'}
+                  width={80}
+                  height={80}
+                  className="rounded-full"
+                />
+              )}
+              <div>
+                <h1 className="text-4xl font-bold">
+                  {user?.firstName || user?.username || 'User'}'s Profile
+                </h1>
+                <p className={`text-lg mt-1 ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+                  {games.length} games rated
+                </p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4 max-w-2xl">
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>Total Ratings</p>
+                <p className="text-2xl font-bold">{games.length}</p>
+              </div>
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>Average Rating</p>
+                <p className="text-2xl font-bold">9.8/10</p>
+              </div>
+              <div className={`p-4 rounded-lg border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>S+ Tier Games</p>
+                <p className="text-2xl font-bold">{gamesByTier['S+']?.length || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* My Tier List */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold">My Tier List</h2>
+              <button className={`px-4 py-2 rounded-lg border transition-colors ${isLightMode ? 'border-neutral-300 hover:bg-neutral-100' : 'border-neutral-700 hover:bg-neutral-800'}`}>
+                Share My List
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">
+                <p className={`${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                  Loading your ratings...
+                </p>
+              </div>
+            ) : games.length === 0 ? (
+              <div className={`text-center py-20 border-2 border-dashed rounded-xl ${isLightMode ? 'border-neutral-300' : 'border-neutral-700'}`}>
+                <h3 className="text-2xl font-bold mb-2">No games rated yet</h3>
+                <p className={`mb-6 ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+                  Start rating games to build your personal tier list
+                </p>
+                <Link
+                  href="/"
+                  className={`inline-block px-6 py-3 rounded-lg font-medium transition-colors ${isLightMode ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white text-black hover:bg-neutral-200'}`}
+                >
+                  Browse Games
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {tiers.map(tier => {
+                  const tieredGames = gamesByTier[tier] || []
+                  if (tieredGames.length === 0) return null
+
+                  const tierColor = getTierColor(tier)
+
+                  return (
+                    <div key={tier} className={`rounded-xl overflow-hidden border ${isLightMode ? 'bg-white border-neutral-200' : 'bg-neutral-900 border-neutral-800'}`}>
+                      <div className={`px-6 py-4 border-b flex items-center justify-between ${isLightMode ? 'bg-neutral-50 border-neutral-200' : 'bg-neutral-800/50 border-neutral-700'}`}>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="inline-flex items-center justify-center w-12 h-12 rounded-lg font-bold text-xl bg-black"
+                            style={{
+                              color: tierColor,
+                              filter: `drop-shadow(0 0 6px ${tierColor}) drop-shadow(0 0 12px ${tierColor})`,
+                            }}
+                          >
+                            {tier}
+                          </span>
+                          <div>
+                            <h3 className={`text-xl font-bold ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
+                              {tier} Tier
+                            </h3>
+                            <p className={`text-sm ${isLightMode ? 'text-neutral-600' : 'text-neutral-400'}`}>
+                              {tieredGames.length} {tieredGames.length === 1 ? 'game' : 'games'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                          {tieredGames.map(game => (
+                            <Link
+                              key={game.id}
+                              href={`/products/${game.slug}`}
+                              className={`group rounded-lg overflow-hidden border transition-all hover:scale-105 ${isLightMode ? 'border-neutral-200 hover:border-neutral-300 hover:shadow-lg' : 'border-neutral-800 hover:border-neutral-700'}`}
+                            >
+                              <div className={`aspect-square relative ${isLightMode ? 'bg-neutral-100' : 'bg-neutral-800'}`}>
+                                <Image
+                                  src={game.image_url}
+                                  alt={game.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className={`p-2 ${isLightMode ? 'bg-white' : 'bg-neutral-900'}`}>
+                                <h4 className={`text-xs font-medium line-clamp-2 ${isLightMode ? 'text-neutral-900' : 'text-white'}`}>
+                                  {game.title}
+                                </h4>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className={`text-xs ${isLightMode ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                                    ⭐ {game.userRating}/5
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </SignedIn>
+      </main>
+
+      {/* FOOTER */}
+      <footer className={`mt-16 border-t transition-colors ${isLightMode ? 'border-neutral-200' : 'border-neutral-800'}`}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className={`text-sm ${isLightMode ? 'text-neutral-500' : 'text-neutral-500'}`}>
+            <p>© 2025 S Tier World — Community game ratings and tier lists</p>
           </div>
         </div>
-      </main>
+      </footer>
     </div>
   )
 }
